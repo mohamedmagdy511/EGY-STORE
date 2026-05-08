@@ -2245,6 +2245,18 @@ function logout() {
 // ========== INIT ==========
 async function initApp() {
   loadData();
+  
+  // سحب البيانات المشتركة من السيرفر لكل جهاز
+  try {
+    let serverData = await apiFetch('/api/all-users');
+    if (serverData && serverData.users && Array.isArray(serverData.users)) {
+      db.users = serverData.users;
+      saveData();
+    }
+  } catch (e) {
+    console.log('تحذير: تعذر سحب البيانات من السيرفر. استخدام البيانات المحلية.');
+  }
+
   if (db.users.length === 0) {
     seedData();
     saveData();
