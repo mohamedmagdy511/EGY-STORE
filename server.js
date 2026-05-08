@@ -1,102 +1,78 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 const cors = require('cors');
+const http = require('http');
+const socketIo = require('socket.io');
+const path = require('path');
+require('dotenv').config();
+
+const { auth, adminAuth } = require('./middleware/auth');
+const userController = require('./controllers/userController');
 
 const app = express();
-const DB_PATH = path.join(__dirname, 'db.json');
-const PORT = process.env.PORT || 3000;
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
+const PORT = process.env.PORT || 3000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/egy-store';
+
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Middleware
 app.use(cors({ origin: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
 
-function readDb() {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ users: [] }, null, 2), 'utf8');
-  }
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-}
+// Make io available in requests
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
-function writeDb(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
+// Socket.io connection
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
 
-function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
-}
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 
+// Routes
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/api/users', (req, res) => {
-  const db = readDb();
-  const email = normalizeEmail(req.query.email);
-  if (!email) {
-    return res.status(400).json({ error: 'Missing email query parameter' });
-  }
-  const user = db.users.find(u => normalizeEmail(u.email) === email);
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-  return res.json({ user });
-});
+// User routes
+app.post('/api/register', userController.register);
+app.post('/api/login', userController.login);
+app.get('/api/users', auth, adminAuth, userController.getUsers);
+app.get('/api/all-users', auth, userController.getUsers); // For frontend to load users
+app.get('/api/pending-count', auth, adminAuth, userController.getPendingCount);
+app.put('/api/users/:userId/approve', auth, adminAuth, userController.approveUser);
+app.put('/api/users/:userId', auth, adminAuth, userController.updateUser);
 
-app.post('/api/login', (req, res) => {
-  const db = readDb();
-  const email = normalizeEmail(req.body.email);
-  const password = String(req.body.password || '');
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
-  const user = db.users.find(u => normalizeEmail(u.email) === email && u.password === password);
-  if (!user) {
-    return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
-  }
-  return res.json({ user });
-});
-
-app.post('/api/register', (req, res) => {
-  const db = readDb();
-  const name = String(req.body.name || '').trim();
-  const email = normalizeEmail(req.body.email);
-  const phone = String(req.body.phone || '').trim();
-  const password = String(req.body.password || '').trim();
-
-  if (!name || !email || !phone || !password) {
-    return res.status(400).json({ error: 'يرجى ملء جميع الحقول' });
-  }
-  if (!/^01[025][0-9]{8}$/.test(phone)) {
-    return res.status(400).json({ error: 'الرجاء إدخال رقم هاتف مصري صحيح مكون من 11 رقماً' });
-  }
-  if (db.users.some(u => normalizeEmail(u.email) === email)) {
-    return res.status(409).json({ error: 'هذا البريد الإلكتروني مستخدم بالفعل' });
-  }
-  const user = {
-    id: Date.now(),
-    name,
-    email,
-    phone,
-    password,
-    role: 'employee',
-    permissions: [],
-    approved: false,
-    createdAt: new Date().toISOString()
-  };
-  db.users.push(user);
-  writeDb(db);
-  return res.status(201).json({ user });
-});
-
-app.get('/api/pending-count', (req, res) => {
-  const db = readDb();
-  const pendingCount = db.users.filter(u => !u.approved).length;
-  return res.json({ pendingCount });
-});
-
+// Serve frontend
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 
 app.listen(PORT, () => {
