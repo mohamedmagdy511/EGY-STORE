@@ -7,6 +7,7 @@
 <title>EGY STORE</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Cairo',sans-serif;background:#0f1117;color:#e8eaf0;direction:rtl;min-height:100vh;font-size:14px}
@@ -848,6 +849,8 @@ let db = {
   currentUser: null
 };
 
+let socket = null;
+
 // Use same origin API path when deployed online.
 // If backend is hosted on a different domain, set the full URL here.
 const API_BASE = '';
@@ -1051,6 +1054,75 @@ function seedData() {
     {id:1,email:'mhamedmagdy053@gmail.com',password:'Eladwe511',name:'المالك',role:'admin',permissions:['all'],approved:true}
   ];
   db.orderIdCounter = 1007;
+}
+
+function initSocket() {
+  try {
+    socket = io(window.location.origin, {
+      transports: ['websocket', 'polling'],
+    });
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('Reconnected to server after', attemptNumber, 'attempts');
+    });
+
+    socket.on('reconnect_error', (error) => {
+      console.error('Socket reconnection error:', error);
+    });
+
+    socket.on('userRegistered', (user) => {
+      try {
+        console.log('New user registered:', user);
+        // Refresh users list if on users page
+        if (document.getElementById('page-users') && document.getElementById('page-users').classList.contains('active')) {
+          renderUsers();
+        }
+        // Update pending count if exists
+        if (typeof loadPendingCount === 'function') loadPendingCount();
+      } catch (error) {
+        console.error('Error handling userRegistered event:', error);
+      }
+    });
+
+    socket.on('userUpdated', (user) => {
+      try {
+        console.log('User updated:', user);
+        // Refresh users list if on users page
+        if (document.getElementById('page-users') && document.getElementById('page-users').classList.contains('active')) {
+          renderUsers();
+        }
+      } catch (error) {
+        console.error('Error handling userUpdated event:', error);
+      }
+    });
+
+    socket.on('userDeleted', (userId) => {
+      try {
+        console.log('User deleted:', userId);
+        // Refresh users list if on users page
+        if (document.getElementById('page-users') && document.getElementById('page-users').classList.contains('active')) {
+          renderUsers();
+        }
+      } catch (error) {
+        console.error('Error handling userDeleted event:', error);
+      }
+    });
+
+  } catch (error) {
+    console.error('Failed to initialize socket:', error);
+  }
 }
 
 // ========== NAVIGATION ==========
@@ -1777,26 +1849,34 @@ function deleteShip(id) {
 }
 
 // ========== USERS ==========
-function renderUsers() {
-  document.getElementById('users-table').innerHTML=db.users.map(u=>{
-    let roleLabel = u.role==='admin' ? 'مدير عام' : u.role==='manager' ? 'مدير' : 'موظف';
-    let roleBadge = u.role==='admin' ? 'delivered' : u.role==='manager' ? 'confirmed' : 'new';
-    let statusBadge = u.approved ? '' : '<span class="badge badge-new" style="margin-right:6px">قيد الانتظار</span>';
-    let permissionsText = u.approved ? (u.permissions.length ? u.permissions.join(', ') : 'بدون صلاحيات') : 'بانتظار الموافقة';
-    return `
-    <tr>
-      <td style="font-weight:600">${u.name}</td>
-      <td>${u.email}</td>
-      <td>${statusBadge}<span class="badge badge-${roleBadge}">${roleLabel}</span></td>
-      <td>${permissionsText}</td>
-      <td>
-        <div class="action-btns">
-          <button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text3)">لا توجد حسابات</td></tr>';
+async function renderUsers() {
+  try {
+    const data = await apiFetch('/api/users');
+    const users = data.users || [];
+    document.getElementById('users-table').innerHTML = users.map(u => {
+      let roleLabel = u.role === 'admin' ? 'مدير عام' : u.role === 'manager' ? 'مدير' : 'موظف';
+      let roleBadge = u.role === 'admin' ? 'delivered' : u.role === 'manager' ? 'confirmed' : 'new';
+      let statusBadge = u.approved ? '' : '<span class="badge badge-new" style="margin-right:6px">قيد الانتظار</span>';
+      let permissionsText = u.approved ? (u.permissions && u.permissions.length ? u.permissions.join(', ') : 'بدون صلاحيات') : 'بانتظار الموافقة';
+      return `
+      <tr>
+        <td style="font-weight:600">${u.name}</td>
+        <td>${u.email}</td>
+        <td>${statusBadge}<span class="badge badge-${roleBadge}">${roleLabel}</span></td>
+        <td>${permissionsText}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn btn-outline btn-sm" onclick="editUser('${u._id}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}')">🗑️</button>
+            ${!u.approved ? `<button class="btn btn-success btn-sm" onclick="approveUser('${u._id}')">✅</button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text3)">لا توجد حسابات</td></tr>';
+  } catch (error) {
+    console.error('Error loading users:', error);
+    document.getElementById('users-table').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text3)">خطأ في تحميل الحسابات</td></tr>';
+  }
 }
 
 function openUserModal() {
@@ -1809,46 +1889,97 @@ function openUserModal() {
   document.getElementById('user-modal').classList.remove('section-hidden');
 }
 
-function editUser(id) {
-  let u=db.users.find(u=>u.id===id);
-  if(!u) return;
-  document.getElementById('edit-user-id').value=id;
-  document.getElementById('user-modal-title').textContent='تعديل حساب: '+u.name;
-  document.getElementById('u-name').value=u.name;
-  document.getElementById('u-email').value=u.email;
-  document.getElementById('u-password').value=u.password;
-  document.getElementById('u-role').value=u.role;
-  let perms = document.querySelectorAll('#permissions-list input');
-  perms.forEach(p=>p.checked=u.permissions.includes(p.value));
-  document.getElementById('user-modal').classList.remove('section-hidden');
-}
-
-function saveUser() {
-  let name=document.getElementById('u-name').value.trim();
-  let email=document.getElementById('u-email').value.trim();
-  let password=document.getElementById('u-password').value;
-  let role=document.getElementById('u-role').value;
-  if(!name||!email||!password){alert('أدخل البيانات المطلوبة');return;}
-  let permissions = Array.from(document.querySelectorAll('#permissions-list input:checked')).map(p=>p.value);
-  let approved = permissions.length > 0 || role === 'admin';
-  let editId=Number(document.getElementById('edit-user-id').value);
-  let user={id:editId||Date.now(),name,email,password,role,permissions,approved};
-  if(editId){
-    let idx=db.users.findIndex(u=>u.id===editId);
-    if(idx>=0) db.users[idx]=user;
-  } else {
-    db.users.push(user);
+async function editUser(id) {
+  try {
+    const data = await apiFetch('/api/users');
+    const users = data.users || [];
+    let u = users.find(u => u._id === id);
+    if (!u) return;
+    document.getElementById('edit-user-id').value = id;
+    document.getElementById('user-modal-title').textContent = 'تعديل حساب: ' + u.name;
+    document.getElementById('u-name').value = u.name;
+    document.getElementById('u-email').value = u.email;
+    document.getElementById('u-password').value = ''; // Don't show password
+    document.getElementById('u-role').value = u.role;
+    let perms = document.querySelectorAll('#permissions-list input');
+    perms.forEach(p => p.checked = u.permissions && u.permissions.includes(p.value));
+    document.getElementById('user-modal').classList.remove('section-hidden');
+  } catch (error) {
+    console.error('Error loading user for edit:', error);
+    alert('خطأ في تحميل بيانات المستخدم');
   }
-  closeModal('user-modal');
-  renderUsers();
-  saveData();
 }
 
-function deleteUser(id) {
-  if(!confirm('حذف هذا الحساب؟')) return;
-  db.users=db.users.filter(u=>u.id!==id);
-  renderUsers();
-  saveData();
+async function saveUser() {
+  let name = document.getElementById('u-name').value.trim();
+  let email = document.getElementById('u-email').value.trim();
+  let password = document.getElementById('u-password').value;
+  let role = document.getElementById('u-role').value;
+  if (!name || !email) {
+    alert('أدخل البيانات المطلوبة');
+    return;
+  }
+  let permissions = Array.from(document.querySelectorAll('#permissions-list input:checked')).map(p => p.value);
+  let editId = document.getElementById('edit-user-id').value;
+  try {
+    if (editId) {
+      // Update existing user
+      await apiFetch(`/api/users/${editId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, role, permissions, approved: true })
+      });
+    } else {
+      // Create new user - for admin, approve immediately
+      if (!password) {
+        alert('يجب إدخال كلمة مرور للحساب الجديد');
+        return;
+      }
+      await apiFetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone: '01000000000', password }) // Dummy phone, admin can edit later
+      });
+      // Then update to set role and permissions
+      // But since register creates with approved: false, need to approve
+      // For simplicity, let's assume admin creates approved users
+      // Actually, modify register to accept approved if admin
+      // For now, after register, approve
+      const data = await apiFetch('/api/users');
+      const newUser = data.users.find(u => u.email === email);
+      if (newUser) {
+        await apiFetch(`/api/users/${newUser._id}/approve`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approved: true })
+        });
+        await apiFetch(`/api/users/${newUser._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role, permissions })
+        });
+      }
+    }
+    closeModal('user-modal');
+    renderUsers();
+  } catch (error) {
+    console.error('Error saving user:', error);
+    alert('خطأ في حفظ المستخدم: ' + (error.message || 'غير معروف'));
+  }
+}
+
+async function approveUser(id) {
+  try {
+    await apiFetch(`/api/users/${id}/approve`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved: true })
+    });
+    renderUsers();
+  } catch (error) {
+    console.error('Error approving user:', error);
+    alert('خطأ في الموافقة على المستخدم: ' + (error.message || 'غير معروف'));
+  }
 }
 
 // ========== INVOICE ==========
@@ -2074,6 +2205,7 @@ async function login() {
     document.getElementById('login-modal').classList.add('section-hidden');
     document.body.classList.remove('logged-out');
     applyPermissions();
+    initSocket(); // Initialize socket connection
     if (db.currentUser.permissions.length === 0) {
       showPage('empty');
     } else {
