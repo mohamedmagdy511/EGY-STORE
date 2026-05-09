@@ -22,7 +22,7 @@ let mongoConnected = true;
 let userController = null;
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = "mongodb+srv://mslh751_db:<db_UMRuojPXM4eOlcSp>@cluster0.ud3jbij.mongodb.net/?appName=Cluster0";
+const uri = "mongodb+srv://Mohamed511_db:0511@cluster0.ud3jbij.mongodb.net/?appName=Cluster0";
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -48,8 +48,8 @@ async function run() {
 run().catch(console.dir);
 
 // MongoDB Connection
-const mongoose = require('mongoose');
-const MONGO_URI = process.env.MONGODB_URI || process.env.DB_URI;
+const MONGO_URI = process.env.MONGO_URI;
+console.log(MONGO_URI);
 mongoose.connect(MONGO_URI)
   .then((conn) => {
     console.log(`Database Connected: ${conn.connection.host}`);
