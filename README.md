@@ -1,15 +1,17 @@
-# EGY STORE - Multi-User Real-Time System
+# EGY STORE - Next.js Dashboard
 
-نظام إدارة متجر إلكتروني متعدد المستخدمين في الوقت الفعلي.
+نظام إدارة متجر إلكتروني مبني بـ Next.js App Router مع واجهة حديثة.
 
 ## الميزات
 
-- ✅ نظام مصادقة متقدم (JWT Authentication)
-- ✅ إدارة المستخدمين مع الموافقة من المدير
-- ✅ قاعدة بيانات MongoDB مشتركة
-- ✅ مزامنة البيانات في الوقت الفعلي (Socket.io)
-- ✅ واجهة إدارة شاملة
-- ✅ نظام صلاحيات مرن
+- ✅ Next.js 15 مع App Router
+- ✅ React Components مع Hooks
+- ✅ CSS Modules و Global Styles
+- ✅ API Routes للـ backend
+- ✅ MongoDB لقاعدة البيانات
+- ✅ Socket.io للوقت الفعلي
+- ✅ واجهة متجاوبة بالعربية
+- ✅ نظام صلاحيات ومستخدمين
 
 ## متطلبات التشغيل
 
@@ -30,23 +32,51 @@
    - تأكد من تشغيل MongoDB
    - عدل ملف `.env` إذا لزم الأمر
 
-3. **تهيئة قاعدة البيانات:**
+3. **تشغيل التطبيق:**
    ```bash
-   npm run init-db
+   npm run dev
    ```
 
-4. **تشغيل الخادم:**
-   ```bash
-   npm run server
-   ```
+4. **فتح المتصفح:**
+   - اذهب إلى `http://localhost:3001`
 
-5. **فتح المتصفح:**
-   - اذهب إلى `http://localhost:3000`
+## البنية المعمارية
+
+```
+app/
+├── layout.js          # Root layout
+├── page.js            # Main page
+├── globals.css        # Global styles
+└── api/               # API routes
+
+components/
+├── Sidebar.js         # Navigation sidebar
+├── Dashboard.js       # Dashboard component
+└── ...
+
+lib/
+├── db.js              # Database connection
+└── ...
+
+models/
+├── User.js            # User model
+├── Order.js           # Order model
+└── ...
+```
 
 ## حساب المدير الافتراضي
 
-- **البريد الإلكتروني:** admin@egy-store.com
-- **كلمة المرور:** admin123
+- **البريد الإلكتروني:** mhamedmagdy053@gmail.com
+- **كلمة المرور:** Eladwe511
+
+## التحويل من HTML/CSS/JS
+
+تم تحويل المشروع بالكامل من:
+- HTML pages → React Components
+- Vanilla JavaScript → React Hooks (useState, useEffect)
+- DOM manipulation → React state management
+- Inline CSS → CSS Modules & globals.css
+- External APIs → Next.js API routes
 
 ## API Endpoints
 
